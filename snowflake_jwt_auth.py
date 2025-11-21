@@ -33,10 +33,12 @@ class SnowflakeJWTAuth:
         """
         self.config = config
         self.private_key = self._load_private_key()
-        self.account = config['account']
+        
+        # Ensure account and user are uppercase
+        self.account = config['account'].upper()
         self.user = config['user'].upper()
         
-        # Construct qualified username
+        # Construct qualified username (account.user format)
         self.qualified_username = f"{self.account}.{self.user}"
         
         logger.info(f"JWT Auth initialized for user: {self.qualified_username}")
@@ -76,19 +78,25 @@ class SnowflakeJWTAuth:
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
         
-        # Calculate SHA256 fingerprint
+        # Calculate SHA256 fingerprint (uppercase hex)
         from hashlib import sha256
-        public_key_fp = 'SHA256:' + sha256(public_key_bytes).hexdigest()
+        public_key_fp = 'SHA256:' + sha256(public_key_bytes).hexdigest().upper()
         
         # Create JWT payload
+        # Use epoch timestamps (seconds since Unix epoch)
         now = datetime.now(timezone.utc)
+        iat = int(now.timestamp())
+        exp = int((now + timedelta(hours=1)).timestamp())
         
         payload = {
             'iss': f"{self.qualified_username}.{public_key_fp}",
             'sub': self.qualified_username,
-            'iat': now,
-            'exp': now + timedelta(hours=1)  # Token expires in 1 hour
+            'iat': iat,
+            'exp': exp
         }
+        
+        logger.debug(f"JWT payload - iss: {payload['iss'][:50]}...")
+        logger.debug(f"JWT payload - sub: {payload['sub']}")
         
         # Sign the JWT
         token = jwt.encode(
@@ -111,20 +119,27 @@ class SnowflakeJWTAuth:
         
         jwt_token = self.generate_jwt_token()
         
-        # Construct OAuth token URL
-        account = self.config['account']
+        # Construct OAuth token URL (account should be lowercase in URL)
+        account = self.config['account'].lower()
         token_url = f"https://{account}.snowflakecomputing.com/oauth/token"
+        
+        logger.debug(f"Token URL: {token_url}")
         
         # Prepare request
         headers = {
             'Content-Type': 'application/x-www-form-urlencoded'
         }
         
+        # Get role (uppercase)
+        role = self.config.get('role', 'PUBLIC').upper()
+        
         data = {
             'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
             'assertion': jwt_token,
-            'scope': 'session:role:' + self.config.get('role', 'PUBLIC')
+            'scope': f'session:role:{role}'
         }
+        
+        logger.debug(f"Requesting token with role: {role}")
         
         try:
             response = requests.post(
@@ -149,6 +164,15 @@ class SnowflakeJWTAuth:
             if hasattr(e, 'response') and e.response is not None:
                 logger.error(f"Response status: {e.response.status_code}")
                 logger.error(f"Response body: {e.response.text}")
+            
+            # Add helpful troubleshooting info
+            logger.error("\nTroubleshooting:")
+            logger.error("1. Verify the public key is registered in Snowflake:")
+            logger.error(f"   ALTER USER {self.user} SET RSA_PUBLIC_KEY='<your_key>';")
+            logger.error("2. Ensure the private key matches the registered public key")
+            logger.error(f"3. Check the user exists: {self.user}")
+            logger.error(f"4. Verify account identifier: {self.account}")
+            
             raise
 
 
