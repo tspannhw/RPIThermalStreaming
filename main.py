@@ -13,9 +13,13 @@ import argparse
 import logging
 import time
 import sys
+import os
 import signal
 from datetime import datetime
 from typing import Optional
+
+# Add current directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from thermal_sensor import ThermalSensor
 from thermal_streaming_client import SnowpipeStreamingClient

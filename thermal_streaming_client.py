@@ -13,10 +13,14 @@ import json
 import logging
 import time
 import sys
+import os
 from datetime import datetime, timezone
 from typing import Dict, Optional, List
 import requests
 from pathlib import Path
+
+# Add current directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import JWT authentication module
 from snowflake_jwt_auth import SnowflakeJWTAuth

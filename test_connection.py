@@ -15,10 +15,14 @@ Usage:
 """
 
 import sys
+import os
 import logging
 import argparse
 import json
 from pathlib import Path
+
+# Add current directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Configure logging
 logging.basicConfig(
