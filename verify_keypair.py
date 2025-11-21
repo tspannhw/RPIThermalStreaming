@@ -43,9 +43,9 @@ def main():
                 password=None,
                 backend=default_backend()
             )
-        print("✓ Private key loaded successfully")
+        print("[OK] Private key loaded successfully")
     except Exception as e:
-        print(f"✗ Error loading private key: {e}")
+        print(f"[ERROR] Error loading private key: {e}")
         return 1
     
     # Extract public key
@@ -66,7 +66,7 @@ def main():
     
     # Calculate fingerprint
     fingerprint = 'SHA256:' + sha256(public_key_der).hexdigest().upper()
-    print(f"✓ Public key fingerprint: {fingerprint}")
+    print(f"[OK] Public key fingerprint: {fingerprint}")
     
     # Format public key for Snowflake (remove headers and newlines)
     public_key_str = public_key_pem.decode('utf-8')
@@ -106,7 +106,7 @@ def main():
         f.write(f"-- Verify:\n")
         f.write(f"DESC USER {args.user.upper()};\n")
     
-    print(f"\n✓ SQL saved to: {output_file}")
+    print(f"\n[OK] SQL saved to: {output_file}")
     print("\n" + "=" * 70)
     
     return 0
