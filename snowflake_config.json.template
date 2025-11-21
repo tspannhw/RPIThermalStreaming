@@ -1,0 +1,12 @@
+{
+  "user": "THERMAL_STREAMING_USER",
+  "account": "your_account_identifier",
+  "url": "https://your_account_identifier.snowflakecomputing.com:443",
+  "private_key_file": "rsa_key.p8",
+  "role": "THERMAL_STREAMING_ROLE",
+  "database": "DEMO",
+  "schema": "DEMO",
+  "pipe": "THERMAL_SENSOR_PIPE",
+  "channel_name": "thermal_channel_001"
+}
+

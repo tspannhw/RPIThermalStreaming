@@ -1,0 +1,18 @@
+# Core dependencies for Snowpipe Streaming v2 REST API
+requests>=2.31.0
+PyJWT>=2.8.0
+cryptography>=41.0.0
+
+# Raspberry Pi sensors (for real hardware)
+# Uncomment these if you have physical sensors connected
+# python-scd4x>=0.1.0    # SCD4X: CO2, Temperature, Humidity sensor
+# icp10125>=0.1.0        # ICP10125: Pressure and Temperature sensor
+# sgp30>=0.1.0           # SGP30: eCO2 and TVOC sensor
+# smbus2>=0.4.0          # I2C communication
+
+# System monitoring (works on most platforms)
+psutil>=5.9.0
+
+# Network interface information (optional)
+# netifaces>=0.11.0
+
