@@ -97,16 +97,18 @@ class SnowpipeStreamingClient:
     
     def discover_ingest_host(self) -> str:
         """
-        Discover the ingest host URL using the control plane.
+        Discover the ingest host URL using the hostname endpoint.
         Step 2 in the REST API tutorial.
+        Updated endpoint: /v2/streaming/hostname (not /control)
         """
         logger.info("Discovering ingest host...")
         
-        # Construct control host URL
-        account = self.config['account']
+        # Construct hostname endpoint URL
+        account = self.config['account'].lower()
         self.control_host = f"https://{account}.snowflakecomputing.com"
         
-        url = f"{self.control_host}/v2/streaming/control"
+        # Updated endpoint: /v2/streaming/hostname
+        url = f"{self.control_host}/v2/streaming/hostname"
         
         self._ensure_valid_token()
         
@@ -116,20 +118,43 @@ class SnowpipeStreamingClient:
         }
         
         try:
-            response = requests.post(url, headers=headers, timeout=30)
+            # Use GET method for hostname endpoint
+            response = requests.get(url, headers=headers, timeout=30)
             response.raise_for_status()
             
-            data = response.json()
-            self.ingest_host = data.get('ingest_host')
+            logger.debug(f"Response status: {response.status_code}")
+            logger.debug(f"Response headers: {response.headers}")
+            logger.debug(f"Response body: {response.text}")
+            
+            # Check if response is text (hostname) or JSON
+            if response.headers.get('Content-Type', '').startswith('application/json'):
+                data = response.json()
+                self.ingest_host = data.get('hostname') or data.get('ingest_host')
+            else:
+                # Response might be plain text with just the hostname
+                self.ingest_host = response.text.strip()
             
             if not self.ingest_host:
-                raise ValueError("No ingest_host returned from control plane")
+                raise ValueError("No hostname returned from endpoint")
             
             logger.info(f"Ingest host discovered: {self.ingest_host}")
             return self.ingest_host
             
+        except json.JSONDecodeError as e:
+            # Try to use response text directly as hostname
+            logger.debug(f"Response is not JSON, using as plain text: {response.text}")
+            self.ingest_host = response.text.strip()
+            if self.ingest_host:
+                logger.info(f"Ingest host discovered (plain text): {self.ingest_host}")
+                return self.ingest_host
+            else:
+                logger.error(f"Empty response from hostname endpoint")
+                raise ValueError("Empty response from hostname endpoint")
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to discover ingest host: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Response status: {e.response.status_code}")
+                logger.error(f"Response body: {e.response.text}")
             raise
     
     def open_channel(self) -> Dict:
@@ -160,11 +185,13 @@ class SnowpipeStreamingClient:
         
         payload = {
             'channel_name': self.channel_name,
-            'write_mode': 'CLOUD_STORAGE'
+            'write_mode': 'CLOUD_STORAGE',
+            'role': self.config.get('role', 'ACCOUNTADMIN')  # Include role in payload
         }
         
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            # Try PUT method for channel open
+            response = requests.put(url, headers=headers, json=payload, timeout=30)
             response.raise_for_status()
             
             data = response.json()
@@ -181,8 +208,9 @@ class SnowpipeStreamingClient:
             
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to open channel: {e}")
-            if hasattr(e.response, 'text'):
-                logger.error(f"Response: {e.response.text}")
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Response status: {e.response.status_code}")
+                logger.error(f"Response text: {e.response.text}")
             raise
     
     def append_rows(self, rows: List[Dict]) -> Dict:

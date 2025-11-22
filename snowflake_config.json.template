@@ -1,8 +1,18 @@
 {
+  "_comment": "Choose ONE authentication method below",
+  
+  "_comment_auth_option_1": "OPTION 1: Programmatic Access Token (PAT) - RECOMMENDED - Easier",
+  "pat": "",
+  "_comment_pat_instructions": "Generate PAT in Snowflake: ALTER USER <user> ADD PROGRAMMATIC ACCESS TOKEN; See AUTHENTICATION.md for details.",
+  
+  "_comment_auth_option_2": "OPTION 2: JWT Key-Pair Authentication (More Complex)",
+  "private_key_file": "",
+  "_comment_jwt_instructions": "Generate keys with: ./generate_keys.sh, then register public key in Snowflake",
+  
+  "_comment_required": "Required fields for both auth methods:",
   "user": "THERMAL_STREAMING_USER",
   "account": "your_account_identifier",
   "url": "https://your_account_identifier.snowflakecomputing.com:443",
-  "private_key_file": "rsa_key.p8",
   "role": "THERMAL_STREAMING_ROLE",
   "database": "DEMO",
   "schema": "DEMO",

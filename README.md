@@ -104,21 +104,38 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Step 2: Generate Key Pair
+### Step 2: Choose Authentication Method
 
-Generate RSA key pair for Snowflake authentication:
+This application supports two authentication methods:
 
+**OPTION A: Programmatic Access Token (PAT) - Recommended - Easier**
+
+Generate a PAT in Snowflake:
+```sql
+-- Generate PAT for user (valid 15 days by default)
+ALTER USER THERMAL_STREAMING_USER 
+  ADD PROGRAMMATIC ACCESS TOKEN 
+  NAME = 'thermal_pat'
+  EXPIRES_IN = 90;
+```
+
+**Copy the secret from the output immediately** - you cannot view it again!
+
+Add the PAT to `snowflake_config.json` (see Step 4).
+
+See [Snowflake PAT Documentation](https://docs.snowflake.com/en/user-guide/programmatic-access-tokens) for details.
+
+**OPTION B: JWT Key-Pair Authentication**
+
+Generate RSA key pair:
 ```bash
 chmod +x generate_keys.sh
 ./generate_keys.sh
 ```
 
-This will:
-1. Generate `rsa_key.p8` (private key)
-2. Generate `rsa_key.pub` (public key)
-3. Display the SQL command to register the public key
+This creates `rsa_key.p8` (private key) and displays the SQL command to register the public key.
 
-**IMPORTANT:** Keep `rsa_key.p8` secure and never commit it!
+**See [AUTHENTICATION.md](AUTHENTICATION.md) for detailed instructions.**
 
 ### Step 3: Setup Snowflake
 

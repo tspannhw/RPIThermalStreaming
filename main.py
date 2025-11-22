@@ -22,7 +22,9 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from thermal_sensor import ThermalSensor
-from thermal_streaming_client import SnowpipeStreamingClient
+
+# Use direct insert client (REST API not available on all accounts)
+from thermal_direct_insert import SnowflakeDirectClient as StreamingClient
 
 # Configure logging
 logging.basicConfig(
@@ -65,8 +67,8 @@ class ThermalStreamingApp:
         logger.info("Initializing sensor...")
         self.sensor = ThermalSensor(simulate=simulate)
         
-        logger.info("Initializing Snowflake streaming client...")
-        self.client = SnowpipeStreamingClient(config_file)
+        logger.info("Initializing Snowflake client...")
+        self.client = StreamingClient(config_file)
         
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -82,21 +84,18 @@ class ThermalStreamingApp:
         self.running = False
     
     def initialize(self):
-        """Initialize the streaming connection."""
-        logger.info("Setting up Snowpipe Streaming connection...")
+        """Initialize the Snowflake connection."""
+        logger.info("Setting up Snowflake connection...")
         
         try:
-            # Discover ingest host
-            self.client.discover_ingest_host()
+            # Connect to Snowflake
+            self.client.connect()
             
-            # Open streaming channel
-            self.client.open_channel()
-            
-            logger.info("Streaming channel ready!")
+            logger.info("Snowflake connection ready!")
             return True
             
         except Exception as e:
-            logger.error(f"Failed to initialize streaming: {e}", exc_info=True)
+            logger.error(f"Failed to initialize connection: {e}", exc_info=True)
             return False
     
     def run(self):
@@ -136,26 +135,13 @@ class ThermalStreamingApp:
                                f"CO2={sample['co2']:.0f}ppm, "
                                f"CPU={sample['cpu']:.1f}%")
                 
-                # Stream to Snowflake
+                # Insert to Snowflake
                 try:
-                    self.client.append_rows(readings)
-                    logger.info(f"✓ Successfully streamed {len(readings)} readings")
-                    
-                    # Periodically verify data commitment (every 5 batches)
-                    if batch_count % 5 == 0:
-                        logger.info("Verifying data commitment...")
-                        status = self.client.get_channel_status()
-                        committed = status.get('committed_offset_token', 0)
-                        logger.info(f"Committed offset: {committed}")
-                        
-                        if committed < self.client.offset_token:
-                            logger.warning(
-                                f"Data lag detected: sent={self.client.offset_token}, "
-                                f"committed={committed}"
-                            )
+                    self.client.insert_rows(readings)
+                    logger.info(f"✓ Successfully inserted {len(readings)} readings")
                     
                 except Exception as e:
-                    logger.error(f"Failed to stream batch: {e}")
+                    logger.error(f"Failed to insert batch: {e}")
                     # Continue to next batch even if this one fails
                 
                 # Print statistics every 10 batches
@@ -186,18 +172,11 @@ class ThermalStreamingApp:
         logger.info("=" * 70)
         
         try:
-            # Wait for final data to commit
-            logger.info("Waiting for final data to commit...")
-            if self.client.wait_for_commit(self.client.offset_token, timeout=30):
-                logger.info("All data committed successfully!")
-            else:
-                logger.warning("Timeout waiting for final commit")
-            
             # Print final statistics
             self.client.print_statistics()
             
-            # Close channel (informational - auto-closes)
-            self.client.close_channel()
+            # Close connection
+            self.client.close()
             
         except Exception as e:
             logger.error(f"Error during shutdown: {e}")

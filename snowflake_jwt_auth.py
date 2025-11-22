@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-Snowflake JWT Authentication Module
+Snowflake Authentication Module
 
-Handles JWT token generation and scoped token acquisition for
-Snowpipe Streaming REST API authentication.
+Supports two authentication methods:
+1. JWT Key-Pair Authentication (more complex, requires key generation)
+2. Programmatic Access Token (simpler, generate in Snowflake UI)
 
-Based on Snowflake's key-pair authentication:
-https://docs.snowflake.com/en/developer-guide/sql-api/guide#using-key-pair-authentication
+Based on Snowflake's authentication documentation:
+- JWT: https://docs.snowflake.com/en/developer-guide/sql-api/guide#using-key-pair-authentication
+- Token: https://docs.snowflake.com/en/user-guide/authentication-programmatic-tokens
 """
 
 import jwt
@@ -16,32 +18,46 @@ import requests
 from datetime import datetime, timedelta, timezone
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
-from typing import Dict
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class SnowflakeJWTAuth:
-    """Handles JWT authentication for Snowflake."""
+    """Handles authentication for Snowflake (JWT or Access Token)."""
     
     def __init__(self, config: Dict):
         """
-        Initialize JWT authentication.
+        Initialize authentication.
+        
+        Supports two methods:
+        1. JWT (requires private_key_file in config)
+        2. Access Token (requires access_token in config)
         
         Args:
-            config: Configuration dictionary with account, user, private_key_file, etc.
+            config: Configuration dictionary
         """
         self.config = config
-        self.private_key = self._load_private_key()
-        
-        # Ensure account and user are uppercase
         self.account = config['account'].upper()
         self.user = config['user'].upper()
         
-        # Construct qualified username (account.user format)
-        self.qualified_username = f"{self.account}.{self.user}"
-        
-        logger.info(f"JWT Auth initialized for user: {self.qualified_username}")
+        # Check which authentication method to use
+        if 'pat' in config and config['pat']:
+            # Use Programmatic Access Token (PAT) - simpler method
+            self.auth_method = 'pat'
+            self.pat = config['pat']
+            logger.info(f"PAT authentication initialized for user: {self.user}")
+        elif 'private_key_file' in config and config['private_key_file']:
+            # Use JWT key-pair authentication
+            self.auth_method = 'jwt'
+            self.private_key = self._load_private_key()
+            self.qualified_username = f"{self.account}.{self.user}"
+            logger.info(f"JWT auth initialized for user: {self.qualified_username}")
+        else:
+            raise ValueError(
+                "No authentication method configured. "
+                "Provide either 'pat' (Programmatic Access Token) or 'private_key_file' in config."
+            )
     
     def _load_private_key(self):
         """Load private key from PEM file."""
@@ -110,12 +126,35 @@ class SnowflakeJWTAuth:
     
     def get_scoped_token(self) -> str:
         """
+        Get authentication token.
+        
+        Returns either:
+        1. The Programmatic Access Token (PAT) if using PAT auth
+        2. OAuth token from JWT exchange (if using JWT auth)
+        
+        Returns:
+            Authentication token string
+        """
+        if self.auth_method == 'pat':
+            # Simple: just return the PAT
+            logger.info("Using Programmatic Access Token (PAT)")
+            return self.pat
+        
+        elif self.auth_method == 'jwt':
+            # Complex: exchange JWT for OAuth token
+            return self._get_jwt_oauth_token()
+        
+        else:
+            raise ValueError(f"Unknown auth method: {self.auth_method}")
+    
+    def _get_jwt_oauth_token(self) -> str:
+        """
         Exchange JWT for a scoped token using Snowflake's OAuth endpoint.
         
         Returns:
             Scoped access token string
         """
-        logger.info("Requesting scoped token from Snowflake...")
+        logger.info("Exchanging JWT for OAuth token...")
         
         jwt_token = self.generate_jwt_token()
         
@@ -156,22 +195,24 @@ class SnowflakeJWTAuth:
             if not access_token:
                 raise ValueError("No access_token in response")
             
-            logger.info("Scoped token obtained successfully")
+            logger.info("OAuth token obtained successfully")
             return access_token
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to get scoped token: {e}")
+            logger.error(f"Failed to get OAuth token: {e}")
             if hasattr(e, 'response') and e.response is not None:
                 logger.error(f"Response status: {e.response.status_code}")
                 logger.error(f"Response body: {e.response.text}")
             
             # Add helpful troubleshooting info
-            logger.error("\nTroubleshooting:")
+            logger.error("\nTroubleshooting JWT Auth:")
             logger.error("1. Verify the public key is registered in Snowflake:")
             logger.error(f"   ALTER USER {self.user} SET RSA_PUBLIC_KEY='<your_key>';")
             logger.error("2. Ensure the private key matches the registered public key")
             logger.error(f"3. Check the user exists: {self.user}")
             logger.error(f"4. Verify account identifier: {self.account}")
+            logger.error("\nOR switch to Programmatic Access Token (PAT):")
+            logger.error("   Add 'pat' to your snowflake_config.json")
             
             raise
 

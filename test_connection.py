@@ -42,8 +42,8 @@ def test_configuration(config_file: str) -> bool:
         with open(config_file, 'r') as f:
             config = json.load(f)
         
-        required_fields = ['user', 'account', 'private_key_file', 'role', 
-                          'database', 'schema', 'pipe']
+        # Required fields for all auth methods
+        required_fields = ['user', 'account', 'role', 'database', 'schema', 'pipe']
         
         missing_fields = [f for f in required_fields if f not in config]
         
@@ -51,13 +51,28 @@ def test_configuration(config_file: str) -> bool:
             logger.error(f"Missing required fields: {missing_fields}")
             return False
         
-        logger.info(f"✓ Configuration loaded successfully")
+        # Check for at least one authentication method
+        has_pat = 'pat' in config and config.get('pat')
+        has_jwt = 'private_key_file' in config and config.get('private_key_file')
+        
+        if not has_pat and not has_jwt:
+            logger.error("No authentication method configured!")
+            logger.error("Provide either 'pat' (Programmatic Access Token) or 'private_key_file' (JWT)")
+            return False
+        
+        logger.info("[OK] Configuration loaded successfully")
         logger.info(f"  User: {config['user']}")
         logger.info(f"  Account: {config['account']}")
         logger.info(f"  Database: {config['database']}")
         logger.info(f"  Schema: {config['schema']}")
         logger.info(f"  Pipe: {config['pipe']}")
-        logger.info(f"  Private key file: {config['private_key_file']}")
+        
+        if has_pat:
+            logger.info(f"  Auth method: PAT (Programmatic Access Token)")
+            logger.info(f"  PAT: {config['pat'][:20]}...") 
+        elif has_jwt:
+            logger.info(f"  Auth method: JWT Key-Pair")
+            logger.info(f"  Private key file: {config['private_key_file']}")
         
         return True
         
@@ -73,45 +88,58 @@ def test_configuration(config_file: str) -> bool:
         return False
 
 
-def test_private_key(config: dict) -> bool:
-    """Test private key loading."""
+def test_authentication_method(config: dict) -> bool:
+    """Test authentication method (PAT or JWT)."""
     logger.info("\n" + "=" * 70)
-    logger.info("TEST 2: Private Key")
+    logger.info("TEST 2: Authentication Method")
     logger.info("=" * 70)
     
-    private_key_file = config['private_key_file']
-    
-    if not Path(private_key_file).exists():
-        logger.error(f"Private key file not found: {private_key_file}")
-        logger.error("Run: ./generate_keys.sh")
-        return False
-    
-    try:
-        from cryptography.hazmat.backends import default_backend
-        from cryptography.hazmat.primitives import serialization
-        
-        with open(private_key_file, 'rb') as key_file:
-            private_key = serialization.load_pem_private_key(
-                key_file.read(),
-                password=None,
-                backend=default_backend()
-            )
-        
-        logger.info(f"✓ Private key loaded successfully")
-        logger.info(f"  File: {private_key_file}")
-        logger.info(f"  Key type: {type(private_key).__name__}")
-        
+    # Check for PAT
+    if 'pat' in config and config.get('pat'):
+        logger.info("[OK] Using PAT (Programmatic Access Token)")
+        logger.info(f"  PAT length: {len(config['pat'])} characters")
+        logger.info(f"  PAT starts with: {config['pat'][:15]}...")
         return True
+    
+    # Check for JWT
+    if 'private_key_file' in config and config.get('private_key_file'):
+        logger.info("Using JWT Key-Pair Authentication")
+        private_key_file = config['private_key_file']
         
-    except Exception as e:
-        logger.error(f"Error loading private key: {e}")
-        return False
+        if not Path(private_key_file).exists():
+            logger.error(f"Private key file not found: {private_key_file}")
+            logger.error("Run: ./generate_keys.sh")
+            return False
+        
+        try:
+            from cryptography.hazmat.backends import default_backend
+            from cryptography.hazmat.primitives import serialization
+            
+            with open(private_key_file, 'rb') as key_file:
+                private_key = serialization.load_pem_private_key(
+                    key_file.read(),
+                    password=None,
+                    backend=default_backend()
+                )
+            
+            logger.info(f"[OK] Private key loaded successfully")
+            logger.info(f"  File: {private_key_file}")
+            logger.info(f"  Key type: {type(private_key).__name__}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error loading private key: {e}")
+            return False
+    
+    logger.error("No valid authentication method found")
+    return False
 
 
-def test_jwt_auth(config: dict) -> bool:
-    """Test JWT token generation and scoped token acquisition."""
+def test_auth(config: dict) -> bool:
+    """Test authentication (PAT or JWT)."""
     logger.info("\n" + "=" * 70)
-    logger.info("TEST 3: JWT Authentication")
+    logger.info("TEST 3: Authentication")
     logger.info("=" * 70)
     
     try:
@@ -119,26 +147,46 @@ def test_jwt_auth(config: dict) -> bool:
         
         auth = SnowflakeJWTAuth(config)
         
-        # Generate JWT token
-        jwt_token = auth.generate_jwt_token()
-        logger.info(f"✓ JWT token generated")
-        logger.info(f"  Token length: {len(jwt_token)} characters")
-        
-        # Get scoped token
-        logger.info("Requesting scoped token from Snowflake...")
-        scoped_token = auth.get_scoped_token()
-        logger.info(f"✓ Scoped token obtained")
-        logger.info(f"  Token length: {len(scoped_token)} characters")
-        logger.info(f"  Token prefix: {scoped_token[:50]}...")
+        if auth.auth_method == 'pat':
+            # Using PAT
+            logger.info("Using PAT authentication")
+            token = auth.get_scoped_token()
+            logger.info(f"[OK] PAT validated")
+            logger.info(f"  Token length: {len(token)} characters")
+        else:
+            # Using JWT
+            logger.info("Using JWT authentication")
+            
+            # Generate JWT token
+            jwt_token = auth.generate_jwt_token()
+            logger.info(f"[OK] JWT token generated")
+            logger.info(f"  Token length: {len(jwt_token)} characters")
+            
+            # Get OAuth token
+            logger.info("Requesting OAuth token from Snowflake...")
+            token = auth.get_scoped_token()
+            logger.info(f"[OK] OAuth token obtained")
+            logger.info(f"  Token length: {len(token)} characters")
+            logger.info(f"  Token prefix: {token[:50]}...")
         
         return True
         
     except Exception as e:
         logger.error(f"Authentication failed: {e}", exc_info=True)
-        logger.error("\nPossible issues:")
-        logger.error("1. Public key not registered in Snowflake")
-        logger.error("2. User or account identifier incorrect")
-        logger.error("3. Network connectivity issues")
+        
+        if 'pat' in config and config.get('pat'):
+            logger.error("\nTroubleshooting PAT authentication:")
+            logger.error("1. Verify the PAT is valid (not expired or revoked)")
+            logger.error("2. Check: SHOW USER PROGRAMMATIC ACCESS TOKENS FOR USER <user>;")
+            logger.error("3. Generate new PAT: ALTER USER <user> ADD PROGRAMMATIC ACCESS TOKEN;")
+        else:
+            logger.error("\nTroubleshooting JWT authentication:")
+            logger.error("1. Public key not registered in Snowflake")
+            logger.error("2. User or account identifier incorrect")
+            logger.error("3. Network connectivity issues")
+            logger.error("\nOR switch to PAT (easier):")
+            logger.error("  See GENERATE_PAT.md for instructions")
+        
         return False
 
 
@@ -250,18 +298,19 @@ def main():
         logger.error("\n❌ Configuration test failed. Fix configuration before proceeding.")
         return 1
     
-    # Test 2: Private Key
-    results['private_key'] = test_private_key(config)
+    # Test 2: Authentication Method
+    results['auth_method'] = test_authentication_method(config)
     
-    if not results['private_key']:
-        logger.error("\n❌ Private key test failed. Generate keys before proceeding.")
+    if not results['auth_method']:
+        logger.error("\n[ERROR] Authentication method test failed.")
+        logger.error("Add 'pat' to your config or generate JWT keys.")
         return 1
     
-    # Test 3: JWT Authentication
-    results['jwt_auth'] = test_jwt_auth(config)
+    # Test 3: Authentication
+    results['authentication'] = test_auth(config)
     
-    if not results['jwt_auth']:
-        logger.error("\n❌ Authentication test failed. Check Snowflake setup.")
+    if not results['authentication']:
+        logger.error("\n[ERROR] Authentication test failed. Check Snowflake setup.")
         return 1
     
     # Test 4: Streaming Client
@@ -287,7 +336,7 @@ def main():
     
     if all_passed:
         logger.info("\n" + "=" * 70)
-        logger.info("✓ ALL TESTS PASSED!")
+        logger.info("[SUCCESS] ALL TESTS PASSED!")
         logger.info("=" * 70)
         logger.info("\nYou're ready to run the application:")
         logger.info("  python main.py --simulate")
@@ -295,9 +344,11 @@ def main():
         return 0
     else:
         logger.error("\n" + "=" * 70)
-        logger.error("✗ SOME TESTS FAILED")
+        logger.error("[FAILED] SOME TESTS FAILED")
         logger.error("=" * 70)
         logger.error("\nPlease fix the issues above before running the application.")
+        logger.error("\nQuick fix: Use PAT authentication (easier)")
+        logger.error("  See GENERATE_PAT.md for instructions")
         logger.error("=" * 70)
         return 1
 
