@@ -201,24 +201,24 @@ def test_streaming_client(config: dict) -> bool:
         
         # Initialize client
         client = SnowpipeStreamingClient(config_file='snowflake_config.json')
-        logger.info(f"✓ Client initialized")
+        logger.info(f"[OK] Client initialized")
         
         # Discover ingest host
         logger.info("Discovering ingest host...")
         ingest_host = client.discover_ingest_host()
-        logger.info(f"✓ Ingest host discovered: {ingest_host}")
+        logger.info(f"[OK] Ingest host discovered: {ingest_host}")
         
         # Open channel
         logger.info(f"Opening channel: {client.channel_name}...")
         result = client.open_channel()
-        logger.info(f"✓ Channel opened successfully")
+        logger.info(f"[OK] Channel opened successfully")
         logger.info(f"  Channel: {client.channel_name}")
         logger.info(f"  Initial offset: {client.offset_token}")
         
         # Get channel status
         logger.info("Getting channel status...")
         status = client.get_channel_status()
-        logger.info(f"✓ Channel status retrieved")
+        logger.info(f"[OK] Channel status retrieved")
         
         committed_offset = status.get('committed_offset_token', 0)
         logger.info(f"  Committed offset: {committed_offset}")
@@ -255,7 +255,7 @@ def test_sensor() -> bool:
         logger.info("Reading sensor data...")
         data = sensor.read_sensor_data()
         
-        logger.info(f"✓ Sensor data read successfully")
+        logger.info(f"[OK] Sensor data read successfully")
         logger.info(f"  Temperature: {data['temperature']:.2f}°C")
         logger.info(f"  Humidity: {data['humidity']:.1f}%")
         logger.info(f"  CO2: {data['co2']:.0f} ppm")
@@ -295,7 +295,7 @@ def main():
     results['configuration'] = test_configuration(args.config)
     
     if not results['configuration']:
-        logger.error("\n❌ Configuration test failed. Fix configuration before proceeding.")
+        logger.error("\n[ERROR] Configuration test failed. Fix configuration before proceeding.")
         return 1
     
     # Test 2: Authentication Method
@@ -317,7 +317,7 @@ def main():
     results['streaming_client'] = test_streaming_client(config)
     
     if not results['streaming_client']:
-        logger.error("\n❌ Streaming client test failed. Check Snowflake pipe setup.")
+        logger.error("\n[ERROR] Streaming client test failed. Check Snowflake pipe setup.")
         return 1
     
     # Test 5: Sensor
@@ -329,7 +329,7 @@ def main():
     logger.info("=" * 70)
     
     for test_name, passed in results.items():
-        status = "✓ PASSED" if passed else "✗ FAILED"
+        status = "[OK] PASSED" if passed else "[FAILED]"
         logger.info(f"{test_name:20s}: {status}")
     
     all_passed = all(results.values())

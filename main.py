@@ -138,7 +138,7 @@ class ThermalStreamingApp:
                 # Insert to Snowflake
                 try:
                     self.client.insert_rows(readings)
-                    logger.info(f"✓ Successfully inserted {len(readings)} readings")
+                    logger.info(f"[OK] Successfully inserted {len(readings)} readings")
                     
                 except Exception as e:
                     logger.error(f"Failed to insert batch: {e}")

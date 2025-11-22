@@ -41,7 +41,7 @@ def check_i2c_devices():
                 pass
         
         if devices:
-            logger.info(f"✓ Found {len(devices)} I2C device(s):")
+            logger.info(f"[OK] Found {len(devices)} I2C device(s):")
             for addr in devices:
                 logger.info(f"  - 0x{addr:02X}")
         else:
@@ -70,7 +70,7 @@ def check_scd4x():
         # Start periodic measurement
         sensor.start_periodic_measurement()
         
-        logger.info("✓ SCD4X sensor initialized successfully")
+        logger.info("[OK] SCD4X sensor initialized successfully")
         logger.info("  Address: 0x62")
         logger.info("  Measures: CO2, Temperature, Humidity")
         
@@ -84,11 +84,11 @@ def check_scd4x():
         return True
         
     except ImportError:
-        logger.warning("✗ SCD4X library not installed")
+        logger.warning("[ERROR] SCD4X library not installed")
         logger.info("  Install with: pip install python-scd4x")
         return False
     except Exception as e:
-        logger.error(f"✗ SCD4X sensor error: {e}")
+        logger.error(f"[ERROR] SCD4X sensor error: {e}")
         return False
 
 
@@ -100,7 +100,7 @@ def check_icp10125():
         from icp10125 import ICP10125
         sensor = ICP10125()
         
-        logger.info("✓ ICP10125 sensor initialized successfully")
+        logger.info("[OK] ICP10125 sensor initialized successfully")
         logger.info("  Address: 0x63")
         logger.info("  Measures: Pressure, Temperature")
         
@@ -112,11 +112,11 @@ def check_icp10125():
         return True
         
     except ImportError:
-        logger.warning("✗ ICP10125 library not installed")
+        logger.warning("[ERROR] ICP10125 library not installed")
         logger.info("  Install with: pip install icp10125")
         return False
     except Exception as e:
-        logger.error(f"✗ ICP10125 sensor error: {e}")
+        logger.error(f"[ERROR] ICP10125 sensor error: {e}")
         return False
 
 
@@ -128,7 +128,7 @@ def check_sgp30():
         from sgp30 import SGP30
         sensor = SGP30()
         
-        logger.info("✓ SGP30 sensor initialized successfully")
+        logger.info("[OK] SGP30 sensor initialized successfully")
         logger.info("  Address: 0x58")
         logger.info("  Measures: eCO2, TVOC")
         
@@ -142,11 +142,11 @@ def check_sgp30():
         return True
         
     except ImportError:
-        logger.warning("✗ SGP30 library not installed")
+        logger.warning("[ERROR] SGP30 library not installed")
         logger.info("  Install with: pip install sgp30")
         return False
     except Exception as e:
-        logger.error(f"✗ SGP30 sensor error: {e}")
+        logger.error(f"[ERROR] SGP30 sensor error: {e}")
         return False
 
 
@@ -168,7 +168,7 @@ def main():
     if devices:
         logger.info("\nExpected sensor addresses:")
         for addr, name in expected_sensors.items():
-            found = "✓ FOUND" if addr in devices else "✗ MISSING"
+            found = "[OK] FOUND" if addr in devices else "[MISSING]"
             logger.info(f"  0x{addr:02X} - {name}: {found}")
     
     # Check each sensor with its library
@@ -188,11 +188,11 @@ def main():
     logger.info(f"Working sensors: {working_sensors}/{total_sensors}")
     
     for sensor_name, working in results.items():
-        status = "✓ OK" if working else "✗ NOT WORKING"
+        status = "[OK]" if working else "[NOT WORKING]"
         logger.info(f"  {sensor_name.upper()}: {status}")
     
     if working_sensors == total_sensors:
-        logger.info("\n✓ All sensors working! Ready to run the application.")
+        logger.info("\n[OK] All sensors working! Ready to run the application.")
         logger.info("  Run: python main.py")
         return 0
     elif working_sensors > 0:
@@ -200,7 +200,7 @@ def main():
         logger.info("  You can still run in simulation mode: python main.py --simulate")
         return 1
     else:
-        logger.error("\n✗ No sensors working")
+        logger.error("\n[ERROR] No sensors working")
         logger.info("  Run in simulation mode: python main.py --simulate")
         logger.info("\nTroubleshooting:")
         logger.info("  1. Enable I2C: sudo raspi-config → Interface Options → I2C")

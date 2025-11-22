@@ -69,7 +69,7 @@ class SnowflakeDirectClient:
             
             self.cursor = self.conn.cursor()
             
-            logger.info("✓ Connected to Snowflake")
+            logger.info("[OK] Connected to Snowflake")
             logger.info(f"  Database: {self.config['database']}")
             logger.info(f"  Schema: {self.config['schema']}")
             
@@ -105,27 +105,31 @@ class SnowflakeDirectClient:
         logger.info(f"Inserting {len(rows)} rows...")
         
         try:
-            # Prepare INSERT statement with VALUES
-            # Cast JSON string to VARIANT using TO_VARIANT
-            insert_sql = """
-            INSERT INTO THERMAL_SENSOR_DATA (
-                raw_data, uuid, rowid, hostname, host, ipaddress, macaddress,
-                temperature, humidity, co2, equivalentco2ppm, totalvocppb, pressure,
-                cputempf, temperatureicp, cpu, memory, diskusage, runtime,
-                ts, systemtime, starttime, endtime, datetimestamp, te
-            ) VALUES (
-                TO_VARIANT(PARSE_JSON(%s)), %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s
-            )
-            """
+            # Insert rows one by one (executemany doesn't work well with PARSE_JSON)
+            # Use individual INSERT statements
+            rows_inserted = 0
             
-            # Prepare data tuples
-            data_tuples = []
             for row in rows:
-                data_tuple = (
-                    json.dumps(row),  # raw_data as JSON string (will be auto-converted to VARIANT)
+                # Convert row to JSON for raw_data column
+                raw_json = json.dumps(row)
+                
+                # Use PARSE_JSON in the INSERT statement directly
+                insert_sql = f"""
+                INSERT INTO THERMAL_SENSOR_DATA (
+                    raw_data, uuid, rowid, hostname, host, ipaddress, macaddress,
+                    temperature, humidity, co2, equivalentco2ppm, totalvocppb, pressure,
+                    cputempf, temperatureicp, cpu, memory, diskusage, runtime,
+                    ts, systemtime, starttime, endtime, datetimestamp, te
+                ) SELECT
+                    PARSE_JSON(%s),
+                    %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s
+                """
+                
+                self.cursor.execute(insert_sql, (
+                    raw_json,
                     row.get('uuid'),
                     row.get('rowid'),
                     row.get('hostname'),
@@ -148,21 +152,18 @@ class SnowflakeDirectClient:
                     row.get('systemtime'),
                     row.get('starttime'),
                     row.get('endtime'),
-                    row.get('datetimestamp'),  # Already in correct format
+                    row.get('datetimestamp'),
                     row.get('te')
-                )
-                data_tuples.append(data_tuple)
+                ))
+                rows_inserted += 1
             
-            # Execute batch insert
-            self.cursor.executemany(insert_sql, data_tuples)
             self.conn.commit()
             
-            # Update statistics
-            rows_inserted = len(rows)
+            # Update statistics (rows_inserted already counted in loop)
             self.stats['total_rows_inserted'] += rows_inserted
             self.stats['total_batches'] += 1
             
-            logger.info(f"✓ Inserted {rows_inserted} rows successfully")
+            logger.info(f"[OK] Inserted {rows_inserted} rows successfully")
             
             return rows_inserted
             
