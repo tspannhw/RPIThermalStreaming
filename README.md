@@ -2,6 +2,9 @@
 
 A Python application that streams thermal and environmental sensor data from a Raspberry Pi 4 to Snowflake using the **Snowpipe Streaming v2 REST API** (high-performance architecture).
 
+
+![arc](https://github.com/tspannhw/RPIThermalStreaming/blob/main/Gemini_Generated_Image_7ula2v7ula2v7ula.png)
+
 ## Overview
 
 This application continuously reads data from sensors connected to a Raspberry Pi and streams it in near real-time to Snowflake. It supports:
