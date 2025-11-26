@@ -51,7 +51,11 @@ class SnowpipeStreamingClient:
         # Streaming state
         self.control_host = None
         self.ingest_host = None
-        self.channel_name = self.config.get('channel_name', 'thermal_channel_001')
+        # Use unique channel name with timestamp to avoid stale token conflicts
+        base_channel = self.config.get('channel_name', 'TH_CHNL')
+        import datetime
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        self.channel_name = f"{base_channel}_{timestamp}"
         self.continuation_token = None
         self.offset_token = 0
         self.scoped_token = None
@@ -173,9 +177,10 @@ class SnowpipeStreamingClient:
         schema = self.config['schema']
         pipe = self.config['pipe']
         
+        # Register channel endpoint (correct Snowflake REST API format)
         url = (
             f"https://{self.ingest_host}/v2/streaming"
-            f"/databases/{db}/schemas/{schema}/pipes/{pipe}/channels/{self.channel_name}:open"
+            f"/databases/{db}/schemas/{schema}/pipes/{pipe}/channels/{self.channel_name}:register"
         )
         
         headers = {
@@ -184,25 +189,35 @@ class SnowpipeStreamingClient:
         }
         
         payload = {
-            'channel_name': self.channel_name,
             'write_mode': 'CLOUD_STORAGE',
             'role': self.config.get('role', 'ACCOUNTADMIN')  # Include role in payload
         }
         
         try:
-            # Try PUT method for channel open
+            # Use PUT method to register the channel
             response = requests.put(url, headers=headers, json=payload, timeout=30)
             response.raise_for_status()
             
             data = response.json()
             
+            # Debug: Log full response
+            logger.debug(f"Open channel response: {json.dumps(data, indent=2)}")
+            
             # Extract tokens
             self.continuation_token = data.get('next_continuation_token')
             channel_status = data.get('channel_status', {})
-            self.offset_token = channel_status.get('last_committed_offset_token', 0)
+            self.offset_token = channel_status.get('last_committed_offset_token')
+            
+            # Initialize offset token to 0 if None
+            if self.offset_token is None:
+                self.offset_token = 0
             
             logger.info(f"Channel opened successfully")
+            logger.info(f"Continuation token: {self.continuation_token}")
             logger.info(f"Initial offset token: {self.offset_token}")
+            
+            if not self.continuation_token:
+                logger.warning("No continuation token received! This may cause issues.")
             
             return data
             
@@ -212,6 +227,24 @@ class SnowpipeStreamingClient:
                 logger.error(f"Response status: {e.response.status_code}")
                 logger.error(f"Response text: {e.response.text}")
             raise
+    
+    def insert_rows(self, rows: List[Dict]) -> int:
+        """
+        Insert rows to the streaming channel (alias for append_rows).
+        
+        Args:
+            rows: List of dictionaries representing the data rows
+            
+        Returns:
+            Number of rows inserted
+        """
+        if not rows:
+            logger.warning("No rows to insert")
+            return 0
+        
+        # Call append_rows
+        self.append_rows(rows)
+        return len(rows)
     
     def append_rows(self, rows: List[Dict]) -> Dict:
         """
@@ -242,11 +275,20 @@ class SnowpipeStreamingClient:
         schema = self.config['schema']
         pipe = self.config['pipe']
         
+        # Build URL with query parameters
         url = (
             f"https://{self.ingest_host}/v2/streaming/data"
             f"/databases/{db}/schemas/{schema}/pipes/{pipe}/channels/{self.channel_name}/rows"
-            f"?continuationToken={self.continuation_token}&offsetToken={new_offset}"
         )
+        
+        # Add query parameters
+        params = {
+            'continuationToken': self.continuation_token,
+            'offsetToken': str(new_offset)
+        }
+        
+        logger.debug(f"Append URL: {url}")
+        logger.debug(f"Params: {params}")
         
         headers = {
             'Authorization': f'Bearer {self.scoped_token}',
@@ -259,10 +301,17 @@ class SnowpipeStreamingClient:
         try:
             response = requests.post(
                 url,
+                params=params,
                 headers=headers,
                 data=ndjson_data.encode('utf-8'),
                 timeout=30
             )
+            
+            # Log response details if error
+            if response.status_code >= 400:
+                logger.error(f"Append failed with status {response.status_code}")
+                logger.error(f"Response: {response.text}")
+            
             response.raise_for_status()
             
             data = response.json()
