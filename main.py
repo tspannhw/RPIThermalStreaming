@@ -22,9 +22,7 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from thermal_sensor import ThermalSensor
-
-# Use direct insert client (REST API not available on all accounts)
-from thermal_direct_insert import SnowflakeDirectClient as StreamingClient
+from thermal_streaming_client import SnowpipeStreamingClient
 
 # Configure logging
 logging.basicConfig(
@@ -67,8 +65,8 @@ class ThermalStreamingApp:
         logger.info("Initializing sensor...")
         self.sensor = ThermalSensor(simulate=simulate)
         
-        logger.info("Initializing Snowflake client...")
-        self.client = StreamingClient(config_file)
+        logger.info("Initializing Snowpipe Streaming REST API client...")
+        self.client = SnowpipeStreamingClient(config_file)
         
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -84,18 +82,25 @@ class ThermalStreamingApp:
         self.running = False
     
     def initialize(self):
-        """Initialize the Snowflake connection."""
-        logger.info("Setting up Snowflake connection...")
+        """Initialize the Snowpipe Streaming connection."""
+        logger.info("Setting up Snowpipe Streaming connection...")
         
         try:
-            # Connect to Snowflake
-            self.client.connect()
+            # Discover ingest host
+            logger.info("Discovering ingest host...")
+            ingest_host = self.client.discover_ingest_host()
+            logger.info(f"[OK] Ingest host: {ingest_host}")
             
-            logger.info("Snowflake connection ready!")
+            # Open channel
+            logger.info("Opening streaming channel...")
+            self.client.open_channel()
+            logger.info("[OK] Channel opened successfully")
+            
+            logger.info("Snowpipe Streaming connection ready!")
             return True
             
         except Exception as e:
-            logger.error(f"Failed to initialize connection: {e}", exc_info=True)
+            logger.error(f"Failed to initialize streaming: {e}", exc_info=True)
             return False
     
     def run(self):
@@ -135,10 +140,10 @@ class ThermalStreamingApp:
                                f"CO2={sample['co2']:.0f}ppm, "
                                f"CPU={sample['cpu']:.1f}%")
                 
-                # Insert to Snowflake
+                # Insert to Snowflake via Snowpipe Streaming
                 try:
-                    self.client.insert_rows(readings)
-                    logger.info(f"[OK] Successfully inserted {len(readings)} readings")
+                    row_count = self.client.insert_rows(readings)
+                    logger.info(f"[OK] Successfully sent {row_count} readings to Snowpipe Streaming")
                     
                 except Exception as e:
                     logger.error(f"Failed to insert batch: {e}")
@@ -175,8 +180,10 @@ class ThermalStreamingApp:
             # Print final statistics
             self.client.print_statistics()
             
-            # Close connection
-            self.client.close()
+            # Close streaming channel
+            logger.info("Closing streaming channel...")
+            self.client.close_channel()
+            logger.info("[OK] Channel closed")
             
         except Exception as e:
             logger.error(f"Error during shutdown: {e}")
