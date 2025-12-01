@@ -40,8 +40,7 @@ class ThermalStreamingApp:
     """Main application for streaming thermal sensor data to Snowflake."""
     
     def __init__(self, config_file: str = 'snowflake_config.json',
-                 batch_size: int = 10, interval: float = 5.0,
-                 simulate: bool = False):
+                 batch_size: int = 10, interval: float = 5.0):
         """
         Initialize the application.
         
@@ -49,7 +48,8 @@ class ThermalStreamingApp:
             config_file: Path to Snowflake configuration file
             batch_size: Number of readings per batch
             interval: Seconds between batches
-            simulate: Use simulated sensor data
+        
+        Note: PRODUCTION MODE ONLY - No simulation. Requires physical sensors.
         """
         self.config_file = config_file
         self.batch_size = batch_size
@@ -57,13 +57,17 @@ class ThermalStreamingApp:
         self.running = False
         
         logger.info("=" * 70)
-        logger.info("Thermal Sensor Streaming Application")
+        logger.info("Thermal Sensor Streaming Application - PRODUCTION MODE")
         logger.info("Raspberry Pi → Snowflake via Snowpipe Streaming v2 REST API")
         logger.info("=" * 70)
+        logger.info("PRODUCTION CONFIGURATION:")
+        logger.info("  - Real sensor data ONLY (no simulation)")
+        logger.info("  - Snowpipe Streaming high-speed REST API ONLY")
+        logger.info("=" * 70)
         
-        # Initialize components
-        logger.info("Initializing sensor...")
-        self.sensor = ThermalSensor(simulate=simulate)
+        # Initialize components - PRODUCTION MODE ONLY
+        logger.info("Initializing REAL physical sensors...")
+        self.sensor = ThermalSensor(simulate=False, require_real_sensors=True)
         
         logger.info("Initializing Snowpipe Streaming REST API client...")
         self.client = SnowpipeStreamingClient(config_file)
@@ -214,11 +218,6 @@ def main():
         help='Seconds between batches (default: 5.0)'
     )
     parser.add_argument(
-        '--simulate',
-        action='store_true',
-        help='Use simulated sensor data (useful for testing without hardware)'
-    )
-    parser.add_argument(
         '--verbose',
         action='store_true',
         help='Enable verbose logging'
@@ -230,12 +229,14 @@ def main():
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     
+    # PRODUCTION MODE: Verify Snowpipe Streaming is configured
+    logger.info("PRODUCTION MODE: Real sensors + Snowpipe Streaming REST API only")
+    
     # Create and run application
     app = ThermalStreamingApp(
         config_file=args.config,
         batch_size=args.batch_size,
-        interval=args.interval,
-        simulate=args.simulate
+        interval=args.interval
     )
     
     exit_code = app.run()

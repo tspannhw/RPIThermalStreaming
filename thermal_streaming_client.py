@@ -2,8 +2,19 @@
 """
 Snowpipe Streaming v2 REST API Client for Raspberry Pi Thermal Sensor Data
 
-This client uses the high-performance Snowpipe Streaming REST API to ingest
-thermal sensor data from a Raspberry Pi into Snowflake in near real-time.
+PRODUCTION MODE - HIGH-PERFORMANCE STREAMING ONLY
+
+This client EXCLUSIVELY uses the Snowpipe Streaming v2 REST API for high-performance
+data ingestion. It does NOT use:
+  - Direct INSERT statements (no Snowflake Connector)
+  - Batch loading via COPY INTO
+  - Stage-based ingestion
+  
+ONLY Snowpipe Streaming REST API endpoints are used:
+  - /v2/streaming/hostname (discover ingest host)
+  - /v2/streaming/databases/{db}/schemas/{schema}/pipes/{pipe}/channels/{channel} (open/manage channel)
+  - /v2/streaming/data/databases/{db}/schemas/{schema}/pipes/{pipe}/channels/{channel}/rows (append data)
+  - /v2/streaming/databases/{db}/schemas/{schema}/pipes/{pipe}:bulk-channel-status (status)
 
 Based on Snowflake's Snowpipe Streaming v2 REST API:
 https://docs.snowflake.com/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-rest-api
@@ -39,12 +50,29 @@ logger = logging.getLogger(__name__)
 
 class SnowpipeStreamingClient:
     """
-    Client for Snowpipe Streaming v2 REST API.
-    Handles authentication, channel management, and data ingestion.
+    Client for Snowpipe Streaming v2 REST API - PRODUCTION MODE
+    
+    This client EXCLUSIVELY uses Snowpipe Streaming v2 high-performance REST API.
+    NO direct inserts, NO batch loading, ONLY streaming via REST endpoints.
+    
+    Handles:
+    - JWT/PAT authentication
+    - Channel management (open, status)
+    - High-performance data streaming via NDJSON over HTTP
     """
     
     def __init__(self, config_file: str = 'snowflake_config.json'):
-        """Initialize the streaming client."""
+        """
+        Initialize the streaming client.
+        
+        This client ONLY uses Snowpipe Streaming REST API - no direct database connections.
+        """
+        logger.info("=" * 70)
+        logger.info("SNOWPIPE STREAMING CLIENT - PRODUCTION MODE")
+        logger.info("Using ONLY Snowpipe Streaming v2 REST API")
+        logger.info("NO direct inserts - HIGH-PERFORMANCE STREAMING ONLY")
+        logger.info("=" * 70)
+        
         self.config = self._load_config(config_file)
         self.jwt_auth = SnowflakeJWTAuth(self.config)
         
@@ -177,10 +205,11 @@ class SnowpipeStreamingClient:
         schema = self.config['schema']
         pipe = self.config['pipe']
         
-        # Register channel endpoint (correct Snowflake REST API format)
+        # Open channel endpoint - per official docs, use PUT with empty JSON body
+        # https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-rest-tutorial#step-3-open-the-channel
         url = (
             f"https://{self.ingest_host}/v2/streaming"
-            f"/databases/{db}/schemas/{schema}/pipes/{pipe}/channels/{self.channel_name}:register"
+            f"/databases/{db}/schemas/{schema}/pipes/{pipe}/channels/{self.channel_name}"
         )
         
         headers = {
@@ -188,13 +217,11 @@ class SnowpipeStreamingClient:
             'Content-Type': 'application/json'
         }
         
-        payload = {
-            'write_mode': 'CLOUD_STORAGE',
-            'role': self.config.get('role', 'ACCOUNTADMIN')  # Include role in payload
-        }
+        # Empty payload as per official docs
+        payload = {}
         
         try:
-            # Use PUT method to register the channel
+            # Use PUT method with empty body
             response = requests.put(url, headers=headers, json=payload, timeout=30)
             response.raise_for_status()
             

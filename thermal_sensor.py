@@ -36,14 +36,36 @@ except ImportError as e:
 class ThermalSensor:
     """Read thermal and environmental sensor data from Raspberry Pi."""
     
-    def __init__(self, simulate: bool = False):
+    def __init__(self, simulate: bool = False, require_real_sensors: bool = False):
         """
         Initialize sensor reader.
         
         Args:
             simulate: If True, generate simulated data instead of reading real sensors
+            require_real_sensors: If True, raise error if physical sensors not available
+                                  (PRODUCTION MODE - no fallback to simulation)
+        
+        Raises:
+            RuntimeError: If require_real_sensors=True and sensors unavailable
         """
-        self.simulate = simulate or not SENSORS_AVAILABLE
+        # PRODUCTION MODE: Enforce real sensors
+        if require_real_sensors:
+            if not SENSORS_AVAILABLE:
+                raise RuntimeError(
+                    "PRODUCTION MODE FAILED: Physical sensor libraries not available. "
+                    "Install required packages: scd4x, icp10125, sgp30"
+                )
+            if simulate:
+                raise RuntimeError(
+                    "PRODUCTION MODE FAILED: Simulation mode requested but "
+                    "require_real_sensors=True. Cannot use simulated data."
+                )
+            logger.info("PRODUCTION MODE: Real sensors required and enforced")
+            self.simulate = False
+        else:
+            # Development/test mode: Allow simulation fallback
+            self.simulate = simulate or not SENSORS_AVAILABLE
+        
         self.hostname = socket.gethostname()
         self.mac_address = self._get_mac_address()
         self.ip_address = self._get_ip_address()
@@ -51,9 +73,17 @@ class ThermalSensor:
         if not self.simulate:
             try:
                 self._init_sensors()
-                logger.info("Physical sensors initialized")
+                logger.info("Physical sensors initialized successfully")
+                if require_real_sensors:
+                    self._verify_sensors()
             except Exception as e:
-                logger.warning(f"Failed to initialize sensors: {e}")
+                error_msg = f"Failed to initialize sensors: {e}"
+                if require_real_sensors:
+                    raise RuntimeError(
+                        f"PRODUCTION MODE FAILED: {error_msg}. "
+                        "Physical sensors required but initialization failed."
+                    )
+                logger.warning(error_msg)
                 logger.info("Falling back to simulation mode")
                 self.simulate = True
         else:
@@ -97,6 +127,16 @@ class ThermalSensor:
         except Exception as e:
             self.sgp30 = None
             logger.warning(f"SGP30 sensor not found: {e}")
+    
+    def _verify_sensors(self):
+        """Verify at least one sensor is available (for production mode)."""
+        if not hasattr(self, 'scd4x') or self.scd4x is None:
+            if not hasattr(self, 'icp10125') or self.icp10125 is None:
+                raise RuntimeError(
+                    "PRODUCTION MODE FAILED: No sensors initialized. "
+                    "At least SCD4X or ICP10125 must be available."
+                )
+        logger.info("[OK] Sensor verification passed - physical sensors available")
     
     def _get_mac_address(self) -> str:
         """Get MAC address of the primary network interface."""
