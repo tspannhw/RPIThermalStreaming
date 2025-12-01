@@ -5,6 +5,7 @@ Main Application: Raspberry Pi Thermal Sensor to Snowflake Streaming
 Continuously reads thermal sensor data from Raspberry Pi and streams it
 to Snowflake using Snowpipe Streaming v2 REST API.
 
+
 Usage:
     python main.py [--config CONFIG_FILE] [--batch-size SIZE] [--interval SECONDS]
 """
@@ -43,6 +44,7 @@ class ThermalStreamingApp:
                  batch_size: int = 10, interval: float = 5.0):
         """
         Initialize the application.
+        
         
         Args:
             config_file: Path to Snowflake configuration file

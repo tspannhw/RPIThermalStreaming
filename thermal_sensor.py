@@ -8,6 +8,7 @@ This module reads data from various sensors on the Raspberry Pi:
 - SGP30: VOC and eCO2 readings
 - System metrics: CPU temp, memory, disk usage
 
+
 For simulation mode, it generates realistic sensor data.
 """
 

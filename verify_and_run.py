@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Quick verification script to ensure all methods exist before running the app.
-
+   
 PRODUCTION MODE: Real sensors + Snowpipe Streaming REST API only
 """
 import sys

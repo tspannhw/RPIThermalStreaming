@@ -10,6 +10,7 @@ data ingestion. It does NOT use:
   - Batch loading via COPY INTO
   - Stage-based ingestion
   
+  
 ONLY Snowpipe Streaming REST API endpoints are used:
   - /v2/streaming/hostname (discover ingest host)
   - /v2/streaming/databases/{db}/schemas/{schema}/pipes/{pipe}/channels/{channel} (open/manage channel)

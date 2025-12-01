@@ -3,8 +3,8 @@
 Quick verification - Production Mode Check
 
 Verifies:
-- Snowpipe Streaming client methods
-- Configuration file
+- Snowpipe Streaming client methods   
+- Configuration file  
 - Production mode compliance
 """
 import sys
