@@ -92,10 +92,10 @@ class ThermalSensor:
         
         # For simulation - track values for realistic variation
         self.sim_base = {
-            'temperature': 25.0,
-            'humidity': 50.0,
-            'co2': 1000.0,
-            'pressure': 101325.0
+            'temperature': 25.0,    # Room temperature in Celsius
+            'humidity': 50.0,       # Typical indoor humidity %
+            'co2': 1000.0,          # Indoor CO2 in ppm
+            'pressure': 101325.0    # Sea level pressure in Pa
         }
     
     def _init_sensors(self):
@@ -314,6 +314,7 @@ class ThermalSensor:
             "runtime": int(round(elapsed_time)),
             "host": self.hostname,
             "hostname": self.hostname,
+            "local_hostname": self.hostname,  # Clarify this is the local Raspberry Pi hostname
             "macaddress": self.mac_address,
             "endtime": str(end_time),
             "te": str(elapsed_time),
@@ -336,24 +337,28 @@ class ThermalSensor:
         
         return data
     
-    def read_batch(self, count: int = 1, interval: float = 1.0) -> list:
+    def read_batch(self, count: int = 1, interval: float = 1.0, fast_mode: bool = False) -> list:
         """
         Read multiple sensor readings.
         
         Args:
             count: Number of readings to collect
-            interval: Time between readings in seconds
+            interval: Time between readings in seconds (ignored if fast_mode=True)
+            fast_mode: If True, collect readings as fast as possible with minimal delay
             
         Returns:
             List of sensor data dictionaries
         """
         batch = []
+        # Fast mode: minimal delay between readings for maximum throughput
+        actual_interval = 0.05 if fast_mode else interval  # 50ms in fast mode
+        
         for i in range(count):
             data = self.read_sensor_data()
             batch.append(data)
             
             if i < count - 1:  # Don't sleep after last reading
-                time.sleep(interval)
+                time.sleep(actual_interval)
         
         return batch
 

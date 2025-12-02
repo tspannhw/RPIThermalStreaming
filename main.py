@@ -41,7 +41,7 @@ class ThermalStreamingApp:
     """Main application for streaming thermal sensor data to Snowflake."""
     
     def __init__(self, config_file: str = 'snowflake_config.json',
-                 batch_size: int = 10, interval: float = 5.0):
+                 batch_size: int = 10, interval: float = 5.0, fast_mode: bool = False):
         """
         Initialize the application.
         
@@ -50,12 +50,14 @@ class ThermalStreamingApp:
             config_file: Path to Snowflake configuration file
             batch_size: Number of readings per batch
             interval: Seconds between batches
+            fast_mode: If True, maximize throughput by minimizing delays (recommended for Raspberry Pi)
         
         Note: PRODUCTION MODE ONLY - No simulation. Requires physical sensors.
         """
         self.config_file = config_file
         self.batch_size = batch_size
         self.interval = interval
+        self.fast_mode = fast_mode
         self.running = False
         
         logger.info("=" * 70)
@@ -81,6 +83,12 @@ class ThermalStreamingApp:
         logger.info("Initialization complete")
         logger.info(f"Batch size: {batch_size} readings")
         logger.info(f"Batch interval: {interval} seconds")
+        if fast_mode:
+            logger.info("FAST MODE: Enabled for maximum throughput")
+        
+        # Log hostname information
+        logger.info(f"Local hostname: {self.sensor.hostname}")
+        logger.info(f"Local IP: {self.sensor.ip_address}")
     
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals."""
@@ -133,10 +141,19 @@ class ThermalStreamingApp:
                 
                 # Read sensor data
                 logger.info(f"Reading {self.batch_size} sensor samples...")
-                readings = self.sensor.read_batch(
-                    count=self.batch_size,
-                    interval=max(0.5, self.interval / self.batch_size)
-                )
+                if self.fast_mode:
+                    # Fast mode: minimal delay between readings
+                    readings = self.sensor.read_batch(
+                        count=self.batch_size,
+                        interval=0.05,  # 50ms minimum
+                        fast_mode=True
+                    )
+                else:
+                    # Normal mode: spread readings over time
+                    readings = self.sensor.read_batch(
+                        count=self.batch_size,
+                        interval=max(0.5, self.interval / self.batch_size)
+                    )
                 
                 # Log sample data
                 if readings:
@@ -145,6 +162,7 @@ class ThermalStreamingApp:
                                f"Humidity={sample['humidity']:.1f}%, "
                                f"CO2={sample['co2']:.0f}ppm, "
                                f"CPU={sample['cpu']:.1f}%")
+                    logger.info(f"Local hostname: {sample.get('local_hostname', 'N/A')}")
                 
                 # Insert to Snowflake via Snowpipe Streaming
                 try:
@@ -224,6 +242,11 @@ def main():
         action='store_true',
         help='Enable verbose logging'
     )
+    parser.add_argument(
+        '--fast',
+        action='store_true',
+        help='Enable fast mode for maximum throughput (recommended for Raspberry Pi)'
+    )
     
     args = parser.parse_args()
     
@@ -238,7 +261,8 @@ def main():
     app = ThermalStreamingApp(
         config_file=args.config,
         batch_size=args.batch_size,
-        interval=args.interval
+        interval=args.interval,
+        fast_mode=args.fast
     )
     
     exit_code = app.run()

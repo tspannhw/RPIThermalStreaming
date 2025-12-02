@@ -325,6 +325,34 @@ Elapsed time: 75.23 seconds
 Average throughput: 1.99 rows/sec
 Current offset token: 15
 ================================
+
+On Raspberry PI Example Run
+
+2025-12-02 10:29:44,901 [INFO] __main__ - Sample reading: Temp=27.8?C, Humidity=25.9%, CO2=1162ppm, CPU=28.1%
+2025-12-02 10:29:44,901 [INFO] thermal_streaming_client - Appending 10 rows...
+2025-12-02 10:29:44,989 [INFO] thermal_streaming_client - Successfully appended 10 rows
+2025-12-02 10:29:44,992 [INFO] __main__ - [OK] Successfully sent 10 readings to Snowpipe Streaming
+2025-12-02 10:29:44,993 [INFO] __main__ - 
+======================================================================
+2025-12-02 10:29:44,993 [INFO] __main__ - Shutting down...
+2025-12-02 10:29:44,993 [INFO] __main__ - ======================================================================
+2025-12-02 10:29:44,993 [INFO] thermal_streaming_client - ============================================================
+2025-12-02 10:29:44,994 [INFO] thermal_streaming_client - INGESTION STATISTICS
+2025-12-02 10:29:44,994 [INFO] thermal_streaming_client - ============================================================
+2025-12-02 10:29:44,994 [INFO] thermal_streaming_client - Total rows sent: 30
+2025-12-02 10:29:44,994 [INFO] thermal_streaming_client - Total batches: 3
+2025-12-02 10:29:44,994 [INFO] thermal_streaming_client - Total bytes sent: 19,502
+2025-12-02 10:29:44,995 [INFO] thermal_streaming_client - Errors: 0
+2025-12-02 10:29:44,995 [INFO] thermal_streaming_client - Elapsed time: 144.83 seconds
+2025-12-02 10:29:44,995 [INFO] thermal_streaming_client - Average throughput: 0.21 rows/sec
+2025-12-02 10:29:44,995 [INFO] thermal_streaming_client - Current offset token: 3
+2025-12-02 10:29:44,996 [INFO] thermal_streaming_client - ============================================================
+2025-12-02 10:29:44,996 [INFO] __main__ - Closing streaming channel...
+2025-12-02 10:29:44,996 [INFO] thermal_streaming_client - Closing channel: TH_CHNL_20251202_102720
+2025-12-02 10:29:44,996 [INFO] thermal_streaming_client - Channel will auto-close after inactivity period
+2025-12-02 10:29:44,996 [INFO] __main__ - [OK] Channel closed
+2025-12-02 10:29:44,997 [INFO] __main__ - Shutdown complete
+
 ```
 
 ### Snowflake Monitoring
