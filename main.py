@@ -60,7 +60,7 @@ class ThermalStreamingApp:
         
         logger.info("=" * 70)
         logger.info("Thermal Sensor Streaming Application - PRODUCTION MODE")
-        logger.info("Raspberry Pi → Snowflake via Snowpipe Streaming v2 REST API")
+        logger.info("Raspberry Pi -> Snowflake via Snowpipe Streaming v2 REST API")
         logger.info("=" * 70)
         logger.info("PRODUCTION CONFIGURATION:")
         logger.info("  - Real sensor data ONLY (no simulation)")

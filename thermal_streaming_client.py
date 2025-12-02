@@ -493,13 +493,15 @@ def main():
         client.open_channel()
         
         # Sample thermal data (simulating your sensor)
+        import socket
+        actual_hostname = socket.gethostname()
         sample_data = {
             "uuid": "thrml_lgu_20250721181107",
             "ipaddress": "192.168.1.175",
             "cputempf": 126,
             "runtime": 0,
-            "host": "thermal",
-            "hostname": "thermal",
+            "host": actual_hostname,
+            "hostname": actual_hostname,
             "macaddress": "e4:5f:01:7c:3f:34",
             "endtime": "1753121467.469562",
             "te": "0.0008215904235839844",
