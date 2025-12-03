@@ -25,6 +25,7 @@ FILES=(
     "thermal_streaming_client.py"
     "main.py"
     "test_performance.py"
+    "diagnose_performance.py"
     "snowflake_config.json"
 )
 
