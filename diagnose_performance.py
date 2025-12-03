@@ -33,6 +33,12 @@ def diagnose_sensor_performance():
     print(f"Mode: {'REAL SENSORS' if not sensor.simulate else 'SIMULATION'}")
     print()
     
+    # Wait for initial sensor update if using real sensors
+    if not sensor.simulate:
+        print("Waiting 2 seconds for background sensor thread to initialize...")
+        time.sleep(2)
+        print()
+    
     # Test individual components
     print("=" * 70)
     print("Component Timing (10 iterations)")
@@ -96,18 +102,22 @@ def diagnose_sensor_performance():
         print("[OK] CPU monitoring is fast (< 10ms) - cache is working!")
         print()
         
-        if avg_full > 1000:
-            print("[ISSUE] Full sensor read is slow (> 1000ms)")
-            print("        This is likely due to the physical CO2 sensor (SCD4X)")
-            print("        CO2 sensors often take 1-5 seconds per reading.")
+        if avg_full > 500:
+            print("[WARNING] Full sensor read is taking > 500ms")
+            print("          With async sensor reading, this should be < 100ms")
+            print("          The old SYNCHRONOUS code may still be deployed.")
             print()
             print("SOLUTIONS:")
-            print("  1. This is hardware limitation - sensors are just slow")
-            print("  2. You can reduce batch size to send more frequently")
-            print("  3. Expected throughput: ~0.2-1.0 rows/sec (limited by sensor)")
+            print("  1. Deploy the NEW asynchronous sensor reading code")
+            print("  2. New code reads sensors in background thread every 5 seconds")
+            print("  3. read_sensor_data() returns cached values instantly")
+        elif avg_full < 100:
+            print("[OK] Sensor reads are FAST (< 100ms)!")
+            print("     Asynchronous sensor reading is working!")
+            print("     Expected throughput: 5-20+ rows/sec")
         else:
-            print("[OK] Sensor reads are fast!")
-            print("     Expected throughput: 2-10+ rows/sec")
+            print("[OK] Sensor reads are reasonably fast (< 500ms)")
+            print("     Expected throughput: 2-5 rows/sec")
     else:
         print("[WARNING] CPU monitoring taking 10-100ms")
         print("          Caching may not be working optimally.")
@@ -131,7 +141,19 @@ def diagnose_sensor_performance():
     
     print()
     print("=" * 70)
+    
+    # Cleanup
+    print("Cleaning up...")
+    sensor.cleanup()
+    print("Done!")
 
 if __name__ == '__main__':
-    diagnose_sensor_performance()
+    try:
+        diagnose_sensor_performance()
+    except KeyboardInterrupt:
+        print("\nInterrupted by user")
+    except Exception as e:
+        print(f"\nError: {e}")
+        import traceback
+        traceback.print_exc()
 

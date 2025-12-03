@@ -16,6 +16,7 @@ import uuid
 import time
 import socket
 import logging
+import threading
 from datetime import datetime, timezone
 from typing import Dict, Optional
 import json
@@ -82,12 +83,31 @@ class ThermalSensor:
         }
         self._system_metrics_cache_duration = 60.0  # Cache for 60 seconds
         
+        # Cache for environmental sensors (SCD4X, ICP10125, SGP30) - updated asynchronously
+        self._sensor_cache = {
+            'temperature': 0.0,
+            'humidity': 0.0,
+            'co2': 0.0,
+            'pressure': 0.0,
+            'temperatureicp': 0.0,
+            'equivalent_co2_ppm': 65535.0,
+            'tvoc': 0.0,
+            'last_update': 0.0,
+            'update_count': 0
+        }
+        self._sensor_cache_lock = threading.Lock()
+        self._sensor_update_interval = 5.0  # Update sensors every 5 seconds
+        self._sensor_thread = None
+        self._sensor_thread_running = False
+        
         if not self.simulate:
             try:
                 self._init_sensors()
                 logger.info("Physical sensors initialized successfully")
                 if require_real_sensors:
                     self._verify_sensors()
+                # Start background sensor reading thread
+                self._start_sensor_thread()
             except Exception as e:
                 error_msg = f"Failed to initialize sensors: {e}"
                 if require_real_sensors:
@@ -251,18 +271,58 @@ class ThermalSensor:
         self._update_system_metrics_cache()
         return self._system_metrics_cache['disk_usage']
     
-    def read_sensor_data(self) -> Dict:
-        """
-        Read all sensor data and return as dictionary.
+    def _start_sensor_thread(self):
+        """Start background thread for asynchronous sensor reading."""
+        if self.simulate:
+            return
         
-        Returns:
-            Dictionary with all sensor readings and metadata
-        """
-        start_time_dt = datetime.now(timezone.utc)
+        self._sensor_thread_running = True
+        self._sensor_thread = threading.Thread(
+            target=self._sensor_update_loop,
+            daemon=True,
+            name="SensorUpdateThread"
+        )
+        self._sensor_thread.start()
+        logger.info("Background sensor update thread started (updates every 5 seconds)")
+    
+    def _stop_sensor_thread(self):
+        """Stop the background sensor update thread."""
+        if self._sensor_thread and self._sensor_thread_running:
+            logger.info("Stopping background sensor update thread...")
+            self._sensor_thread_running = False
+            if self._sensor_thread.is_alive():
+                self._sensor_thread.join(timeout=2.0)
+            logger.info("Background sensor update thread stopped")
+    
+    def _sensor_update_loop(self):
+        """Background thread loop - continuously updates sensor readings every 5 seconds."""
+        logger.info("Sensor update loop started")
+        
+        # Do initial read immediately
+        self._update_sensor_cache()
+        
+        while self._sensor_thread_running:
+            try:
+                # Sleep in small intervals to allow quick shutdown
+                for _ in range(int(self._sensor_update_interval * 10)):
+                    if not self._sensor_thread_running:
+                        break
+                    time.sleep(0.1)
+                
+                if self._sensor_thread_running:
+                    self._update_sensor_cache()
+                    
+            except Exception as e:
+                logger.error(f"Error in sensor update loop: {e}")
+                time.sleep(1.0)  # Avoid tight error loop
+        
+        logger.info("Sensor update loop exited")
+    
+    def _update_sensor_cache(self):
+        """Update the sensor cache with fresh readings (runs in background thread)."""
         start_time = time.time()
-        now = datetime.now(timezone.utc)
         
-        # Initialize default values
+        # Initialize values
         temperature = None
         humidity = None
         pressure = None
@@ -271,10 +331,9 @@ class ThermalSensor:
         temperatureicp_f = None
         equivalent_co2_ppm = 65535.0
         
-        # Read SCD4X sensor (CO2, temperature, humidity)
-        if not self.simulate and self.scd4x:
+        # Read SCD4X sensor (CO2, temperature, humidity) - THIS IS THE SLOW ONE (1-5 seconds!)
+        if not self.simulate and hasattr(self, 'scd4x') and self.scd4x:
             try:
-                # Use measure() method which returns (co2, temp, humidity, timestamp)
                 co2_reading, temp_reading, hum_reading, timestamp = self.scd4x.measure()
                 temperature = temp_reading
                 humidity = hum_reading
@@ -284,19 +343,17 @@ class ThermalSensor:
                 logger.warning(f"Error reading SCD4X: {e}")
         
         # Read ICP10125 sensor (pressure and temperature)
-        if not self.simulate and self.icp10125:
+        if not self.simulate and hasattr(self, 'icp10125') and self.icp10125:
             try:
-                # Use measure() method which returns (pressure, temperature)
                 pressure_reading, temp_icp_c = self.icp10125.measure()
-                pressure = pressure_reading  # In Pascals
-                # Convert to Fahrenheit like the original code
+                pressure = pressure_reading
                 temperatureicp_f = round(9.0/5.0 * float(temp_icp_c) + 32, 2)
                 logger.debug(f"ICP10125: Pressure={pressure}Pa, Temp={temperatureicp_f}°F")
             except Exception as e:
                 logger.warning(f"Error reading ICP10125: {e}")
         
         # Read SGP30 sensor (eCO2 and VOC)
-        if not self.simulate and self.sgp30:
+        if not self.simulate and hasattr(self, 'sgp30') and self.sgp30:
             try:
                 result = self.sgp30.get_air_quality()
                 equivalent_co2_ppm = round(float(result.equivalent_co2), 5)
@@ -305,7 +362,7 @@ class ThermalSensor:
             except Exception as e:
                 logger.warning(f"Error reading SGP30: {e}")
         
-        # Fall back to simulation if sensors didn't provide data
+        # Use defaults if sensors didn't provide data
         if temperature is None:
             temperature = 0.0
         if humidity is None:
@@ -318,6 +375,51 @@ class ThermalSensor:
             tvoc = 0.0
         if temperatureicp_f is None:
             temperatureicp_f = round(9.0/5.0 * float(temperature) + 32, 2)
+        
+        # Update cache with lock
+        elapsed = time.time() - start_time
+        with self._sensor_cache_lock:
+            self._sensor_cache['temperature'] = temperature
+            self._sensor_cache['humidity'] = humidity
+            self._sensor_cache['co2'] = co2
+            self._sensor_cache['pressure'] = pressure
+            self._sensor_cache['temperatureicp'] = temperatureicp_f
+            self._sensor_cache['equivalent_co2_ppm'] = equivalent_co2_ppm
+            self._sensor_cache['tvoc'] = tvoc
+            self._sensor_cache['last_update'] = time.time()
+            self._sensor_cache['update_count'] += 1
+        
+        logger.debug(f"Sensor cache updated in {elapsed:.2f}s (update #{self._sensor_cache['update_count']})")
+    
+    def read_sensor_data(self) -> Dict:
+        """
+        Read all sensor data and return as dictionary.
+        
+        PERFORMANCE: Environmental sensors (SCD4X, ICP10125, SGP30) are read asynchronously
+        in a background thread every 5 seconds. This method returns the CACHED values instantly,
+        avoiding the 1-5 second blocking delay from the CO2 sensor.
+        
+        Returns:
+            Dictionary with all sensor readings and metadata
+        """
+        start_time_dt = datetime.now(timezone.utc)
+        start_time = time.time()
+        now = datetime.now(timezone.utc)
+        
+        # Get sensor values from cache (instant, no blocking!)
+        with self._sensor_cache_lock:
+            temperature = self._sensor_cache['temperature']
+            humidity = self._sensor_cache['humidity']
+            co2 = self._sensor_cache['co2']
+            pressure = self._sensor_cache['pressure']
+            temperatureicp_f = self._sensor_cache['temperatureicp']
+            equivalent_co2_ppm = self._sensor_cache['equivalent_co2_ppm']
+            tvoc = self._sensor_cache['tvoc']
+            cache_age = time.time() - self._sensor_cache['last_update']
+        
+        # Log if cache is getting stale (should be updated every 5 seconds)
+        if cache_age > 10.0:
+            logger.warning(f"Sensor cache is stale ({cache_age:.1f}s old)")
         
         # Get system metrics
         cpu_temp_c = self._get_cpu_temp()
@@ -390,35 +492,74 @@ class ThermalSensor:
                 time.sleep(actual_interval)
         
         return batch
+    
+    def cleanup(self):
+        """Cleanup resources, stop background threads."""
+        logger.info("Cleaning up thermal sensor...")
+        self._stop_sensor_thread()
+        logger.info("Thermal sensor cleanup complete")
+    
+    def __del__(self):
+        """Destructor - ensure cleanup happens."""
+        try:
+            self.cleanup()
+        except:
+            pass  # Avoid errors during garbage collection
 
 
 def main():
-    """Test sensor reading."""
+    """Test sensor reading with performance measurement."""
     logging.basicConfig(level=logging.INFO)
     
-    logger.info("Testing Thermal Sensor Reader")
+    logger.info("Testing Thermal Sensor Reader with Asynchronous Sensor Updates")
+    logger.info("=" * 70)
     
     # Initialize sensor (will auto-detect or simulate)
     sensor = ThermalSensor()
     
-    # Read a few samples
-    for i in range(3):
-        logger.info(f"\n--- Reading {i+1} ---")
+    logger.info(f"Sensor mode: {'REAL SENSORS' if not sensor.simulate else 'SIMULATION'}")
+    logger.info("Background thread will update sensors every 5 seconds")
+    logger.info("read_sensor_data() returns cached values INSTANTLY (no blocking!)")
+    logger.info("=" * 70)
+    
+    # Wait for first sensor update
+    logger.info("Waiting 2 seconds for initial sensor readings...")
+    time.sleep(2)
+    
+    # Test rapid reading performance
+    logger.info("\nTesting rapid sensor reads (should be FAST now!):")
+    start = time.time()
+    
+    for i in range(10):
         data = sensor.read_sensor_data()
         
-        # Print formatted output
-        print(json.dumps(data, indent=2))
+        if i == 0:
+            # Print first sample
+            logger.info(f"\nSample data:")
+            logger.info(f"  Temperature: {data['temperature']:.2f}°C")
+            logger.info(f"  Humidity: {data['humidity']:.1f}%")
+            logger.info(f"  CO2: {data['co2']:.0f} ppm")
+            logger.info(f"  Pressure: {data['pressure']:.1f} Pa")
+            logger.info(f"  CPU Temp: {data['cputempf']:.1f}°F")
+            logger.info(f"  CPU Usage: {data['cpu']:.1f}%")
         
-        # Print key values
-        logger.info(f"Temperature: {data['temperature']:.2f}°C")
-        logger.info(f"Humidity: {data['humidity']:.1f}%")
-        logger.info(f"CO2: {data['co2']:.0f} ppm")
-        logger.info(f"Pressure: {data['pressure']:.1f} Pa")
-        logger.info(f"CPU Temp: {data['cputempf']:.1f}°F")
-        logger.info(f"CPU Usage: {data['cpu']:.1f}%")
-        
-        if i < 2:
-            time.sleep(1)
+        time.sleep(0.1)  # Small delay between reads
+    
+    elapsed = time.time() - start
+    rate = 10 / elapsed
+    
+    logger.info(f"\nPerformance:")
+    logger.info(f"  10 readings in {elapsed:.2f} seconds")
+    logger.info(f"  Rate: {rate:.2f} rows/sec")
+    logger.info(f"  Average time per read: {elapsed/10*1000:.1f} ms")
+    
+    if rate > 5.0:
+        logger.info(f"  SUCCESS! Fast reads enabled (> 5 rows/sec)")
+    else:
+        logger.info(f"  Performance could be better")
+    
+    # Cleanup
+    sensor.cleanup()
 
 if __name__ == '__main__':
     main()

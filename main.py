@@ -209,6 +209,11 @@ class ThermalStreamingApp:
             self.client.close_channel()
             logger.info("[OK] Channel closed")
             
+            # Cleanup sensor (stop background threads)
+            logger.info("Cleaning up sensor...")
+            self.sensor.cleanup()
+            logger.info("[OK] Sensor cleaned up")
+            
         except Exception as e:
             logger.error(f"Error during shutdown: {e}")
         
