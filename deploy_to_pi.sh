@@ -24,6 +24,7 @@ FILES=(
     "thermal_sensor.py"
     "thermal_streaming_client.py"
     "main.py"
+    "test_performance.py"
     "snowflake_config.json"
 )
 
@@ -33,16 +34,16 @@ for file in "${FILES[@]}"; do
     scp "$LOCAL_DIR/$file" "$PI_HOST:$PI_DIR/$file"
     
     if [ $? -eq 0 ]; then
-        echo "✅ $file deployed successfully"
+        echo "[OK] $file deployed successfully"
     else
-        echo "❌ Failed to deploy $file"
+        echo "[ERROR] Failed to deploy $file"
         exit 1
     fi
 done
 
 echo ""
 echo "=========================================="
-echo "✅ Deployment Complete!"
+echo "[OK] Deployment Complete!"
 echo "=========================================="
 echo ""
 echo "To restart the application on Raspberry Pi:"

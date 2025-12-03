@@ -67,9 +67,20 @@ class ThermalSensor:
             # Development/test mode: Allow simulation fallback
             self.simulate = simulate or not SENSORS_AVAILABLE
         
+        # Read these ONLY ONCE at startup
         self.hostname = socket.gethostname()
         self.mac_address = self._get_mac_address()
         self.ip_address = self._get_ip_address()
+        
+        # Cache for system metrics (CPU, memory, disk) - updated once per minute
+        self._system_metrics_cache = {
+            'cpu_temp': 0.0,
+            'cpu_usage': 0.0,
+            'memory_usage': 0.0,
+            'disk_usage': "0.0 MB",
+            'last_update': 0.0
+        }
+        self._system_metrics_cache_duration = 60.0  # Cache for 60 seconds
         
         if not self.simulate:
             try:
@@ -176,45 +187,69 @@ class ThermalSensor:
         except:
             return "127.0.0.1"
     
-    def _get_cpu_temp(self) -> float:
-        """Get CPU temperature in Celsius."""
+    def _update_system_metrics_cache(self):
+        """Update cached system metrics (CPU, memory, disk) - called max once per minute."""
+        current_time = time.time()
+        
+        # Check if cache is still valid
+        if current_time - self._system_metrics_cache['last_update'] < self._system_metrics_cache_duration:
+            return  # Cache is still fresh
+        
+        # Update CPU temperature
         try:
             with open('/sys/devices/virtual/thermal/thermal_zone0/temp', 'r') as f:
                 cputemp = f.readline().strip()
-                temp_c = round(float(cputemp) / 1000.0)
-                return temp_c
+                self._system_metrics_cache['cpu_temp'] = round(float(cputemp) / 1000.0)
         except:
-            # Simulation fallback
-            import random
-            return 40.0 + random.uniform(-5, 15)
-    
-    def _get_cpu_usage(self) -> float:
-        """Get CPU usage percentage."""
+            self._system_metrics_cache['cpu_temp'] = 0.0
+        
+        # Update CPU usage (non-blocking)
         try:
             import psutil
-            return psutil.cpu_percent(interval=1)
+            # Use interval=None for instant/cached reading (non-blocking)
+            self._system_metrics_cache['cpu_usage'] = psutil.cpu_percent(interval=None)
         except:
-            import random
-            return random.uniform(5, 25)
-    
-    def _get_memory_usage(self) -> float:
-        """Get memory usage percentage."""
+            self._system_metrics_cache['cpu_usage'] = 0.0
+        
+        # Update memory usage
         try:
             import psutil
-            return psutil.virtual_memory().percent
+            self._system_metrics_cache['memory_usage'] = psutil.virtual_memory().percent
         except:
-            import random
-            return random.uniform(10, 40)
-    
-    def _get_disk_usage(self) -> str:
-        """Get disk FREE space in MB (matches original sensors.py)."""
+            self._system_metrics_cache['memory_usage'] = 0.0
+        
+        # Update disk usage
         try:
             import psutil
             disk = psutil.disk_usage('/')
             free_mb = disk.free / (1024 * 1024)
-            return f"{free_mb:.1f} MB"
+            self._system_metrics_cache['disk_usage'] = f"{free_mb:.1f} MB"
         except:
-            return "92358.2 MB"
+            self._system_metrics_cache['disk_usage'] = "0.0 MB"
+        
+        # Update timestamp
+        self._system_metrics_cache['last_update'] = current_time
+        logger.debug(f"System metrics cache updated at {current_time}")
+    
+    def _get_cpu_temp(self) -> float:
+        """Get CPU temperature in Celsius (cached, updated once per minute)."""
+        self._update_system_metrics_cache()
+        return self._system_metrics_cache['cpu_temp']
+    
+    def _get_cpu_usage(self) -> float:
+        """Get CPU usage percentage (cached, updated once per minute)."""
+        self._update_system_metrics_cache()
+        return self._system_metrics_cache['cpu_usage']
+    
+    def _get_memory_usage(self) -> float:
+        """Get memory usage percentage (cached, updated once per minute)."""
+        self._update_system_metrics_cache()
+        return self._system_metrics_cache['memory_usage']
+    
+    def _get_disk_usage(self) -> str:
+        """Get disk FREE space in MB (cached, updated once per minute)."""
+        self._update_system_metrics_cache()
+        return self._system_metrics_cache['disk_usage']
     
     def read_sensor_data(self) -> Dict:
         """
@@ -272,22 +307,16 @@ class ThermalSensor:
         
         # Fall back to simulation if sensors didn't provide data
         if temperature is None:
-            import random
-            temperature = self.sim_base['temperature'] + random.uniform(-2, 2)
+            temperature = 0.0
         if humidity is None:
-            import random
-            humidity = self.sim_base['humidity'] + random.uniform(-5, 5)
+            humidity = 0.0
         if pressure is None:
-            import random
-            pressure = self.sim_base['pressure'] + random.uniform(-100, 100)
+            pressure = 0.0
         if co2 is None:
-            import random
-            co2 = self.sim_base['co2'] + random.uniform(-100, 100)
+            co2 = 0.0
         if tvoc is None:
-            import random
-            tvoc = random.uniform(0, 500)
+            tvoc = 0.0
         if temperatureicp_f is None:
-            # Use ambient temp converted to F as fallback
             temperatureicp_f = round(9.0/5.0 * float(temperature) + 32, 2)
         
         # Get system metrics
@@ -389,9 +418,7 @@ def main():
         logger.info(f"CPU Usage: {data['cpu']:.1f}%")
         
         if i < 2:
-            time.sleep(2)
-
+            time.sleep(1)
 
 if __name__ == '__main__':
     main()
-
