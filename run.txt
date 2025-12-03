@@ -1,0 +1,76 @@
+2025-12-03 17:11:09,490 [WARNING] thermal_sensor - Sensor cache is stale (1764799869.5s old)
+2025-12-03 17:11:09,541 [WARNING] thermal_sensor - Sensor cache is stale (1764799869.5s old)
+2025-12-03 17:11:12,365 [INFO] __main__ - Sample reading: Temp=0.0?C, Humidity=0.0%, CO2=0ppm, CPU=29.1%
+2025-12-03 17:11:12,366 [INFO] __main__ - Local hostname: thermal
+2025-12-03 17:11:12,366 [INFO] thermal_streaming_client - Appending 100 rows...
+2025-12-03 17:11:12,647 [INFO] thermal_streaming_client - Successfully appended 100 rows
+2025-12-03 17:11:12,650 [INFO] __main__ - [OK] Successfully sent 100 readings to Snowpipe Streaming
+2025-12-03 17:11:12,651 [INFO] __main__ - Waiting 4.7s until next batch...
+2025-12-03 17:11:17,346 [INFO] __main__ - 
+--- Batch 2 ---
+2025-12-03 17:11:17,347 [INFO] __main__ - Reading 100 sensor samples...
+2025-12-03 17:11:22,339 [INFO] __main__ - Sample reading: Temp=31.6?C, Humidity=21.8%, CO2=987ppm, CPU=29.1%
+2025-12-03 17:11:22,339 [INFO] __main__ - Local hostname: thermal
+2025-12-03 17:11:22,339 [INFO] thermal_streaming_client - Appending 100 rows...
+2025-12-03 17:11:22,591 [INFO] thermal_streaming_client - Successfully appended 100 rows
+2025-12-03 17:11:22,595 [INFO] __main__ - [OK] Successfully sent 100 readings to Snowpipe Streaming
+2025-12-03 17:11:22,595 [INFO] __main__ - Waiting 4.8s until next batch...
+2025-12-03 17:11:27,347 [INFO] __main__ - 
+--- Batch 3 ---
+2025-12-03 17:11:27,347 [INFO] __main__ - Reading 100 sensor samples...
+2025-12-03 17:11:32,338 [INFO] __main__ - Sample reading: Temp=31.1?C, Humidity=22.4%, CO2=983ppm, CPU=29.1%
+2025-12-03 17:11:32,339 [INFO] __main__ - Local hostname: thermal
+2025-12-03 17:11:32,339 [INFO] thermal_streaming_client - Appending 100 rows...
+2025-12-03 17:11:32,454 [INFO] thermal_streaming_client - Successfully appended 100 rows
+2025-12-03 17:11:32,457 [INFO] __main__ - [OK] Successfully sent 100 readings to Snowpipe Streaming
+2025-12-03 17:11:32,457 [INFO] __main__ - Waiting 4.9s until next batch...
+2025-12-03 17:11:37,347 [INFO] __main__ - 
+--- Batch 4 ---
+2025-12-03 17:11:37,348 [INFO] __main__ - Reading 100 sensor samples...
+2025-12-03 17:11:42,339 [INFO] __main__ - Sample reading: Temp=30.6?C, Humidity=23.1%, CO2=989ppm, CPU=29.1%
+2025-12-03 17:11:42,340 [INFO] __main__ - Local hostname: thermal
+2025-12-03 17:11:42,340 [INFO] thermal_streaming_client - Appending 100 rows...
+2025-12-03 17:11:42,464 [INFO] thermal_streaming_client - Successfully appended 100 rows
+2025-12-03 17:11:42,467 [INFO] __main__ - [OK] Successfully sent 100 readings to Snowpipe Streaming
+2025-12-03 17:11:42,467 [INFO] __main__ - Waiting 4.9s until next batch...
+2025-12-03 17:11:47,347 [INFO] __main__ - 
+--- Batch 5 ---
+2025-12-03 17:11:47,348 [INFO] __main__ - Reading 100 sensor samples...
+^C2025-12-03 17:11:48,391 [INFO] __main__ - 
+Received signal 2, shutting down gracefully...
+2025-12-03 17:11:52,339 [INFO] __main__ - Sample reading: Temp=30.1?C, Humidity=23.6%, CO2=992ppm, CPU=29.1%
+2025-12-03 17:11:52,340 [INFO] __main__ - Local hostname: thermal
+2025-12-03 17:11:52,340 [INFO] thermal_streaming_client - Appending 100 rows...
+2025-12-03 17:11:52,458 [INFO] thermal_streaming_client - Successfully appended 100 rows
+2025-12-03 17:11:52,461 [INFO] __main__ - [OK] Successfully sent 100 readings to Snowpipe Streaming
+2025-12-03 17:11:52,461 [INFO] __main__ - 
+======================================================================
+2025-12-03 17:11:52,462 [INFO] __main__ - Shutting down...
+2025-12-03 17:11:52,462 [INFO] __main__ - ======================================================================
+2025-12-03 17:11:52,462 [INFO] thermal_streaming_client - ============================================================
+2025-12-03 17:11:52,462 [INFO] thermal_streaming_client - INGESTION STATISTICS
+2025-12-03 17:11:52,462 [INFO] thermal_streaming_client - ============================================================
+2025-12-03 17:11:52,462 [INFO] thermal_streaming_client - Total rows sent: 500
+2025-12-03 17:11:52,463 [INFO] thermal_streaming_client - Total batches: 5
+2025-12-03 17:11:52,463 [INFO] thermal_streaming_client - Total bytes sent: 340,335
+2025-12-03 17:11:52,463 [INFO] thermal_streaming_client - Errors: 0
+2025-12-03 17:11:52,463 [INFO] thermal_streaming_client - Elapsed time: 46.49 seconds
+2025-12-03 17:11:52,463 [INFO] thermal_streaming_client - Average throughput: 10.76 rows/sec
+2025-12-03 17:11:52,464 [INFO] thermal_streaming_client - Current offset token: 5
+2025-12-03 17:11:52,464 [INFO] thermal_streaming_client - ============================================================
+2025-12-03 17:11:52,464 [INFO] __main__ - Closing streaming channel...
+2025-12-03 17:11:52,464 [INFO] thermal_streaming_client - Closing channel: TH_CHNL_20251203_171105
+2025-12-03 17:11:52,464 [INFO] thermal_streaming_client - Channel will auto-close after inactivity period
+2025-12-03 17:11:52,464 [INFO] __main__ - [OK] Channel closed
+2025-12-03 17:11:52,465 [INFO] __main__ - Cleaning up sensor...
+2025-12-03 17:11:52,465 [INFO] thermal_sensor - Cleaning up thermal sensor...
+2025-12-03 17:11:52,465 [INFO] thermal_sensor - Stopping background sensor update thread...
+2025-12-03 17:11:52,474 [INFO] thermal_sensor - Sensor update loop exited
+2025-12-03 17:11:52,475 [INFO] thermal_sensor - Background sensor update thread stopped
+2025-12-03 17:11:52,475 [INFO] thermal_sensor - Thermal sensor cleanup complete
+2025-12-03 17:11:52,475 [INFO] __main__ - [OK] Sensor cleaned up
+2025-12-03 17:11:52,475 [INFO] __main__ - Shutdown complete
+2025-12-03 17:11:52,476 [INFO] thermal_sensor - Cleaning up thermal sensor...
+2025-12-03 17:11:52,476 [INFO] thermal_sensor - Thermal sensor cleanup complete
+
+
